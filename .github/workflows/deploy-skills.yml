@@ -1,0 +1,109 @@
+name: Deploy Skills to Hetzner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+  workflow_dispatch:
+    inputs:
+      skill_name:
+        description: 'Specific skill to deploy (blank = all)'
+        required: false
+        default: ''
+
+env:
+  HETZNER_HOST: 87.99.129.125
+  HETZNER_USER: root
+  SKILLS_TARGET: /root/.claude/skills
+  CLAUDE_CODE_SKILLS: /root/.claude/skills
+
+jobs:
+  deploy-skills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/hetzner
+          chmod 600 ~/.ssh/hetzner
+          ssh-keyscan -H ${{ env.HETZNER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Determine skills to deploy
+        id: skills
+        run: |
+          if [ -n "${{ github.event.inputs.skill_name }}" ]; then
+            echo "targets=${{ github.event.inputs.skill_name }}" >> $GITHUB_OUTPUT
+            echo "mode=single" >> $GITHUB_OUTPUT
+          else
+            # Get changed skills from git diff
+            CHANGED=$(git diff --name-only HEAD~1 HEAD -- skills/ 2>/dev/null | cut -d'/' -f2 | sort -u | tr '\n' ',' | sed 's/,$//')
+            if [ -z "$CHANGED" ]; then
+              CHANGED="all"
+            fi
+            echo "targets=$CHANGED" >> $GITHUB_OUTPUT
+            echo "mode=changed" >> $GITHUB_OUTPUT
+          fi
+          echo "🎯 Deploying: $(cat $GITHUB_OUTPUT | grep targets)"
+
+      - name: Deploy skills to Hetzner
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/hetzner -o StrictHostKeyChecking=no ${{ env.HETZNER_USER }}@${{ env.HETZNER_HOST }}"
+          SCP_CMD="scp -i ~/.ssh/hetzner -o StrictHostKeyChecking=no -r"
+
+          # Ensure target directory exists
+          $SSH_CMD "mkdir -p ${{ env.SKILLS_TARGET }}"
+
+          if [ "${{ steps.skills.outputs.mode }}" = "single" ]; then
+            SKILL="${{ steps.skills.outputs.targets }}"
+            echo "📦 Deploying single skill: $SKILL"
+            $SCP_CMD skills/$SKILL ${{ env.HETZNER_USER }}@${{ env.HETZNER_HOST }}:${{ env.SKILLS_TARGET }}/
+          else
+            echo "📦 Deploying all skills..."
+            $SCP_CMD skills/* ${{ env.HETZNER_USER }}@${{ env.HETZNER_HOST }}:${{ env.SKILLS_TARGET }}/
+          fi
+
+          # Verify deployment
+          echo "✅ Verifying..."
+          $SSH_CMD "ls -la ${{ env.SKILLS_TARGET }}/ && echo '---' && find ${{ env.SKILLS_TARGET }}/ -name 'SKILL.md' -o -name 'skill.md' | sort"
+
+      - name: Symlink to Claude Code skills directory
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/hetzner -o StrictHostKeyChecking=no ${{ env.HETZNER_USER }}@${{ env.HETZNER_HOST }}"
+
+          # Ensure Claude Code can find skills
+          # Claude Code reads from ~/.claude/skills/ by default
+          $SSH_CMD "
+            # If SKILLS_TARGET is already ~/.claude/skills, skip
+            if [ '${{ env.SKILLS_TARGET }}' != '${{ env.CLAUDE_CODE_SKILLS }}' ]; then
+              mkdir -p ${{ env.CLAUDE_CODE_SKILLS }}
+              for skill_dir in ${{ env.SKILLS_TARGET }}/*/; do
+                skill_name=\$(basename \$skill_dir)
+                ln -sfn \$skill_dir ${{ env.CLAUDE_CODE_SKILLS }}/\$skill_name
+              done
+            fi
+            echo '🔗 Skills linked to Claude Code directory'
+          "
+
+      - name: Post-deploy health check
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/hetzner -o StrictHostKeyChecking=no ${{ env.HETZNER_USER }}@${{ env.HETZNER_HOST }}"
+
+          SKILL_COUNT=$($SSH_CMD "find ${{ env.SKILLS_TARGET }}/ -maxdepth 2 -name 'SKILL.md' -o -name 'skill.md' | wc -l")
+          echo "✅ Deployed $SKILL_COUNT skills to Hetzner everest-dispatch"
+
+          # Check animated-ui specifically
+          $SSH_CMD "
+            if [ -f ${{ env.SKILLS_TARGET }}/animated-ui/SKILL.md ]; then
+              echo '✅ animated-ui skill: DEPLOYED'
+              head -5 ${{ env.SKILLS_TARGET }}/animated-ui/SKILL.md
+            else
+              echo '⚠️ animated-ui skill: NOT FOUND'
+              exit 1
+            fi
+          "

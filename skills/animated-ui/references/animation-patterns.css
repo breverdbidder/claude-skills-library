@@ -1,0 +1,288 @@
+/* ============================================
+   ANIMATION PATTERNS — BidDeed.AI & ZoneWise.AI
+   Reference: Load only when building animations
+   ============================================ */
+
+/* ---- 1. PAGE LOAD: Staggered Fade Up ---- */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-on-load {
+  opacity: 0;
+  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-on-load:nth-child(1) { animation-delay: 0ms; }
+.animate-on-load:nth-child(2) { animation-delay: 60ms; }
+.animate-on-load:nth-child(3) { animation-delay: 120ms; }
+.animate-on-load:nth-child(4) { animation-delay: 180ms; }
+.animate-on-load:nth-child(5) { animation-delay: 240ms; }
+
+/* ---- 2. SCROLL REVEAL: IntersectionObserver ---- */
+/*
+  Usage (JS):
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+
+  document.querySelectorAll('.reveal-on-scroll').forEach(el => observer.observe(el));
+*/
+
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children variant */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-stagger.revealed > *:nth-child(1) { transition-delay: 0ms; opacity: 1; transform: translateY(0); }
+.reveal-stagger.revealed > *:nth-child(2) { transition-delay: 80ms; opacity: 1; transform: translateY(0); }
+.reveal-stagger.revealed > *:nth-child(3) { transition-delay: 160ms; opacity: 1; transform: translateY(0); }
+.reveal-stagger.revealed > *:nth-child(4) { transition-delay: 240ms; opacity: 1; transform: translateY(0); }
+.reveal-stagger.revealed > *:nth-child(5) { transition-delay: 320ms; opacity: 1; transform: translateY(0); }
+.reveal-stagger.revealed > *:nth-child(6) { transition-delay: 400ms; opacity: 1; transform: translateY(0); }
+
+/* ---- 3. BUTTON HOVER: Glow + Scale ---- */
+.btn-brand {
+  background: var(--brand-orange);
+  color: var(--brand-bg);
+  padding: 12px 28px;
+  border-radius: 8px;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s ease;
+}
+
+.btn-brand:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.4),
+              0 0 48px rgba(245, 158, 11, 0.15);
+}
+
+.btn-brand:active {
+  transform: scale(0.98);
+}
+
+/* Shimmer sweep on hover */
+.btn-brand::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -75%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+}
+
+.btn-brand:hover::after {
+  left: 125%;
+}
+
+/* ---- 4. CARD HOVER: Lift + Border Glow ---- */
+.card-animated {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 12px;
+  padding: 24px;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s ease,
+              box-shadow 0.3s ease;
+}
+
+.card-animated:hover {
+  transform: translateY(-4px);
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3),
+              0 0 0 1px rgba(245, 158, 11, 0.1);
+}
+
+/* ---- 5. NUMBER COUNT-UP ---- */
+/*
+  Usage (React):
+  function CountUp({ end, duration = 1000 }) {
+    const [count, setCount] = useState(0);
+    const ref = useRef(null);
+
+    useEffect(() => {
+      const observer = new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) {
+          let start = 0;
+          const step = (timestamp) => {
+            if (!start) start = timestamp;
+            const progress = Math.min((timestamp - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3); // ease-out-cubic
+            setCount(Math.floor(eased * end));
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+          observer.disconnect();
+        }
+      }, { threshold: 0.5 });
+
+      if (ref.current) observer.observe(ref.current);
+      return () => observer.disconnect();
+    }, [end, duration]);
+
+    return <span ref={ref}>{count.toLocaleString()}</span>;
+  }
+*/
+
+/* ---- 6. STATUS BADGE PULSE (BID/REVIEW/SKIP) ---- */
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color); }
+  50% { box-shadow: 0 0 0 8px transparent; }
+}
+
+.badge-bid {
+  --pulse-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.15);
+  color: #22C55E;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  animation: badgePulse 2s ease infinite;
+}
+
+.badge-review {
+  --pulse-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  animation: badgePulse 2s ease infinite;
+}
+
+.badge-skip {
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  /* No pulse — skip is static/final */
+}
+
+/* ---- 7. TABLE ROW STAGGER (Auction Data) ---- */
+@keyframes rowSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.table-animated tbody tr {
+  opacity: 0;
+  animation: rowSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.table-animated tbody tr:nth-child(1) { animation-delay: 0ms; }
+.table-animated tbody tr:nth-child(2) { animation-delay: 40ms; }
+.table-animated tbody tr:nth-child(3) { animation-delay: 80ms; }
+.table-animated tbody tr:nth-child(4) { animation-delay: 120ms; }
+.table-animated tbody tr:nth-child(5) { animation-delay: 160ms; }
+.table-animated tbody tr:nth-child(6) { animation-delay: 200ms; }
+.table-animated tbody tr:nth-child(7) { animation-delay: 240ms; }
+.table-animated tbody tr:nth-child(8) { animation-delay: 280ms; }
+.table-animated tbody tr:nth-child(9) { animation-delay: 320ms; }
+.table-animated tbody tr:nth-child(10) { animation-delay: 360ms; }
+
+/* ---- 8. MESH GRADIENT BACKGROUND ---- */
+@keyframes meshShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.bg-mesh-brand {
+  background: linear-gradient(
+    -45deg,
+    #020617,
+    #1E3A5F,
+    #0F172A,
+    rgba(245, 158, 11, 0.08)
+  );
+  background-size: 400% 400%;
+  animation: meshShift 20s ease infinite;
+}
+
+/* ---- 9. MAPBOX PARCEL HIGHLIGHT (ZoneWise) ---- */
+/*
+  Mapbox GL JS paint properties for animated parcel highlight:
+
+  map.addLayer({
+    id: 'parcel-highlight',
+    type: 'fill',
+    source: 'parcels',
+    paint: {
+      'fill-color': '#F59E0B',
+      'fill-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        0.35,
+        0
+      ],
+      'fill-opacity-transition': { duration: 300 }
+    }
+  });
+
+  map.addLayer({
+    id: 'parcel-highlight-border',
+    type: 'line',
+    source: 'parcels',
+    paint: {
+      'line-color': '#F59E0B',
+      'line-width': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        2.5,
+        0
+      ],
+      'line-opacity-transition': { duration: 200 }
+    }
+  });
+*/
+
+/* ---- 10. REDUCED MOTION ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
